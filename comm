@@ -1,0 +1,76 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+
+local ball = workspace:WaitForChild("Basketball")
+
+local MIN_HEIGHT = 12
+local MAX_HEIGHT = 20
+local MAX_DISTANCE = 15
+
+local wasInRange = false
+
+-- Toggle settings
+local enabled = false
+local hWasDown = false
+
+RunService.Heartbeat:Connect(function()
+    -- H toggle
+    local hIsDown = iskeypressed(0x48)
+
+    if hIsDown and not hWasDown then
+        enabled = not enabled
+
+        if enabled then
+            print("Auto jump: ON")
+        else
+            print("Auto jump: OFF")
+        end
+    end
+
+    hWasDown = hIsDown
+
+    if not enabled then
+        return
+    end
+
+    if not ball or not ball.Parent then
+        return
+    end
+
+    local ballPosition = ball.Position
+    local playerPosition = root.Position
+
+    local ballIsAtCorrectHeight =
+        ballPosition.Y >= MIN_HEIGHT
+        and ballPosition.Y <= MAX_HEIGHT
+
+    local horizontalDistance = Vector3.new(
+        ballPosition.X - playerPosition.X,
+        0,
+        ballPosition.Z - playerPosition.Z
+    ).Magnitude
+
+    local inRange =
+        ballIsAtCorrectHeight
+        and horizontalDistance <= MAX_DISTANCE
+
+    if inRange and not wasInRange then
+        wasInRange = true
+
+        print("Ball is in range — pressing Space")
+
+        task.spawn(function()
+            keypress(0x20)
+            task.wait(0.05)
+            keyrelease(0x20)
+        end)
+    end
+
+    if not inRange then
+        wasInRange = false
+    end
+end)
