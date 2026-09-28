@@ -7,15 +7,9 @@ local root = character:WaitForChild("HumanoidRootPart")
 
 local ball = workspace:WaitForChild("Basketball")
 
--- Vertical hitbox
-local MIN_ABOVE = 14
-local MAX_ABOVE = 50
-
--- Horizontal distance
-local MAX_DISTANCE = 18
-
--- X offset
-local X_OFFSET = 0
+local MIN_HEIGHT = 12
+local MAX_HEIGHT = 20
+local MAX_DISTANCE = 15
 
 local wasInRange = false
 
@@ -25,84 +19,73 @@ local xWasDown = false
 
 -- Refresh root every 15 seconds
 task.spawn(function()
-	while true do
-		task.wait(15)
+    while true do
+        task.wait(15)
 
-		local newCharacter = player.Character
-		if newCharacter then
-			local newRoot = newCharacter:FindFirstChild("HumanoidRootPart")
-			if newRoot then
-				root = newRoot
-			end
-		end
-	end
+        local newCharacter = player.Character
+        if newCharacter then
+            local newRoot = newCharacter:FindFirstChild("HumanoidRootPart")
+            if newRoot then
+                root = newRoot
+            end
+        end
+    end
 end)
 
 RunService.Heartbeat:Connect(function()
-	-- X toggle
-	local xIsDown = iskeypressed(0x58)
+    -- X toggle
+    local xIsDown = iskeypressed(0x58)
 
-	if xIsDown and not xWasDown then
-		enabled = not enabled
+    if xIsDown and not xWasDown then
+        enabled = not enabled
 
-		if enabled then
-			print("folk block on")
-		else
-			print("folk block off")
-		end
-	end
+        if enabled then
+            print("folk autoblock on")
+        else
+            print("folk autoblock on")
+        end
+    end
 
-	xWasDown = xIsDown
+    xWasDown = xIsDown
 
-	if not enabled then
-		return
-	end
+    if not enabled then
+        return
+    end
 
-	if not ball or not ball.Parent then
-		return
-	end
+    if not ball or not ball.Parent then
+        return
+    end
 
-	local ok, err = pcall(function()
-		local ballPosition = ball.Position + Vector3.new(X_OFFSET, 0, 0)
-		local playerPosition = root.Position
+    local ballPosition = ball.Position
+    local playerPosition = root.Position
 
-		local heightAbove = ballPosition.Y - playerPosition.Y
+    local ballIsAtCorrectHeight =
+        ballPosition.Y >= MIN_HEIGHT
+        and ballPosition.Y <= MAX_HEIGHT
 
-		local horizontalDistance = Vector3.new(
-			ballPosition.X - playerPosition.X,
-			0,
-			ballPosition.Z - playerPosition.Z
-		).Magnitude
+    local horizontalDistance = Vector3.new(
+        ballPosition.X - playerPosition.X,
+        0,
+        ballPosition.Z - playerPosition.Z
+    ).Magnitude
 
-		local ballIsAboveMe =
-			heightAbove >= MIN_ABOVE
-			and heightAbove <= MAX_ABOVE
+    local inRange =
+        ballIsAtCorrectHeight
+        and horizontalDistance <= MAX_DISTANCE
 
-		local ballIsCloseEnough =
-			horizontalDistance <= MAX_DISTANCE
+    if inRange and not wasInRange then
+        wasInRange = true
 
-		local inRange =
-			ballIsAboveMe
-			and ballIsCloseEnough
+        print("ball near ur butt")
 
-		if inRange and not wasInRange then
-			wasInRange = true
+        task.spawn(function()
+            keypress(0x20)
+            task.wait(0.05)
+            keyrelease(0x20)
+        end)
+    end
 
-			print("ball above me — jumping")
-
-			task.spawn(function()
-				keypress(0x20)
-				task.wait(0.05)
-				keyrelease(0x20)
-			end)
-		end
-
-		if not inRange then
-			wasInRange = false
-		end
-	end)
-
-	if not ok then
-		warn("yo them errors tried to fuck u up but pcall got ur back:", err)
-	end
+    if not inRange then
+        wasInRange = false
+    end
 end)
