@@ -87,5 +87,115 @@ RunService.Heartbeat:Connect(function()
 
     if not inRange then
         wasInRange = false
+-- Ball Magnet + Hitbox Expander (Matcha)
+-- Both are client-side. They only "work" if the game decides hits / ball contact on YOUR client
+-- (or you own the ball's network ownership). Test each and see which one the game respects.
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ===== helpers =====
+local function getBall()
+    local ball = workspace:FindFirstChild("Basketball")
+    if not ball then return nil end
+    if ball:IsA("BasePart") then return ball end
+    return ball.PrimaryPart or ball:FindFirstChildWhichIsA("BasePart")
+end
+
+local function getRoot(char)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+-- remember original sizes so we can restore them
+local original = {}
+
+local function setHitbox(player, size)
+    local root = getRoot(player.Character)
+    if not root then return end
+    if original[root] == nil then original[root] = root.Size end
+    pcall(function()
+        root.Size = size
+        root.Transparency = 0.85
+        root.CanCollide = false
+    end)
+end
+
+local function restoreHitboxes()
+    for root, size in pairs(original) do
+        pcall(function() root.Size = size end)
+    end
+    original = {}
+end
+
+-- ===== menu =====
+local magKb, hbKb
+UI.AddTab("Hitbox & Magnet", function(tab)
+    local mag = tab:Section("Ball Magnet", "Left")
+    mag:Toggle("mg_on", "Magnet")
+    magKb = mag:Keybind("mg_kb", 0x47, "toggle")  -- G
+    magKb:AddToHotkey("Magnet", "mg_on")
+    mag:SliderInt("mg_range", "Range (studs)", 5, 60, 20)
+    mag:SliderFloat("mg_strength", "Pull Strength", 5.0, 120.0, 40.0, "%.0f")
+    mag:Combo("mg_mode", "Mode", {"Velocity pull", "Snap to hand"}, 0)
+    mag:Tip("Velocity pull is more likely to replicate; Snap is more aggressive")
+
+    local hb = tab:Section("Hitbox Expander", "Right")
+    hb:Toggle("hb_on", "Expand Enemy Hitboxes")
+    hbKb = hb:Keybind("hb_kb", 0x48, "toggle")    -- H
+    hbKb:AddToHotkey("Hitbox", "hb_on")
+    hb:SliderInt("hb_size", "Size", 2, 30, 8)
+    hb:Toggle("hb_team", "Team Check", true)
+end)
+
+-- ===== ball magnet loop =====
+task.spawn(function()
+    while true do
+        wait(0.02)
+        if UI.GetValue("mg_on") and (magKb == nil or magKb:IsEnabled()) then
+            local ball = getBall()
+            local root = getRoot(LocalPlayer.Character)
+            if ball and root then
+                local toMe = root.Position - ball.Position
+                local dist = toMe.Magnitude
+                if dist <= UI.GetValue("mg_range") and dist > 1.5 then
+                    if UI.GetValue("mg_mode") == 0 then
+                        pcall(function()
+                            ball.AssemblyLinearVelocity = toMe.Unit * UI.GetValue("mg_strength")
+                        end)
+                    else
+                        pcall(function()
+                            ball.Position = root.Position + root.CFrame.LookVector * 2 + Vector3.new(0, 1, 0)
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ===== hitbox loop =====
+local wasOn = false
+task.spawn(function()
+    while true do
+        wait(0.25)
+        local on = UI.GetValue("hb_on") and (hbKb == nil or hbKb:IsEnabled())
+        if on then
+            local s = UI.GetValue("hb_size")
+            local size = Vector3.new(s, s, s)
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local sameTeam = UI.GetValue("hb_team") and p.Team ~= nil and p.Team == LocalPlayer.Team
+                    if not sameTeam then setHitbox(p, size) end
+                end
+            end
+            wasOn = true
+        elseif wasOn then
+            restoreHitboxes()
+            wasOn = false
+        end
+    end
+end)
+
+notify("Magnet (G) + Hitbox (H) loaded.", "Matcha", 4)
     end
 end)
